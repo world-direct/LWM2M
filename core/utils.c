@@ -494,6 +494,7 @@ lwm2m_media_type_t utils_convertMediaType(coap_content_type_t type)
         break;
 #endif
     case LWM2M_CONTENT_JSON:
+    case APPLICATION_JSON: //minor bugfix because of wd lwm2m server
         result = LWM2M_CONTENT_JSON;
         break;
     case LWM2M_CONTENT_SENML_JSON:
