@@ -401,6 +401,7 @@ size_t utils_base64Encode(const uint8_t * dataP, size_t dataLen, uint8_t * buffe
 size_t utils_base64GetDecodedSize(const char * dataP, size_t dataLen);
 size_t utils_base64Decode(const char * dataP, size_t dataLen, uint8_t * bufferP, size_t bufferLen);
 #ifdef LWM2M_CLIENT_MODE
+int utils_getMandatoryInfo(lwm2m_object_t * objectP, uint16_t instanceID, lwm2m_server_t * targetP);
 lwm2m_server_t * utils_findServer(lwm2m_context_t * contextP, void * fromSessionH);
 lwm2m_server_t * utils_findBootstrapServer(lwm2m_context_t * contextP, void * fromSessionH);
 #endif

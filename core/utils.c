@@ -53,7 +53,6 @@
 #include <stdio.h>
 #include <float.h>
 
-
 int utils_textToInt(const uint8_t * buffer,
                     int length,
                     int64_t * dataP)
@@ -524,6 +523,54 @@ lwm2m_server_t * utils_findServer(lwm2m_context_t * contextP,
 
     return targetP;
 }
+
+int utils_getMandatoryInfo(lwm2m_object_t * objectP,
+                                uint16_t instanceID,
+                                lwm2m_server_t * targetP)
+{
+    lwm2m_data_t * dataP;
+    int size;
+    int64_t value;
+
+    size = 2;
+    dataP = lwm2m_data_new(size);
+    if (dataP == NULL) return -1;
+    dataP[0].id = LWM2M_SERVER_LIFETIME_ID;
+    dataP[1].id = LWM2M_SERVER_BINDING_ID;
+
+    if (objectP->readFunc(instanceID, &size, &dataP, objectP) != COAP_205_CONTENT)
+    {
+        lwm2m_data_free(size, dataP);
+        return -1;
+    }
+
+    if (0 == lwm2m_data_decode_int(dataP, &value)
+     || value < 0 || value >0xFFFFFFFF)             // This is an implementation limit
+    {
+        lwm2m_data_free(size, dataP);
+        return -1;
+    }
+    targetP->lifetime = value;
+
+    if (dataP[1].type == LWM2M_TYPE_STRING)
+    {
+        targetP->binding = utils_stringToBinding(dataP[1].value.asBuffer.buffer, dataP[1].value.asBuffer.length);
+    }
+    else
+    {
+        targetP->binding = BINDING_UNKNOWN;
+    }
+
+    lwm2m_data_free(size, dataP);
+
+    if (targetP->binding == BINDING_UNKNOWN)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
 #endif
 
 lwm2m_server_t * utils_findBootstrapServer(lwm2m_context_t * contextP,
