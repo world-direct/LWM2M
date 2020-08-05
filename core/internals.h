@@ -321,6 +321,9 @@ void registration_freeClient(lwm2m_client_t * clientP);
 uint8_t registration_start(lwm2m_context_t * contextP, bool restartFailed);
 void registration_step(lwm2m_context_t * contextP, time_t currentTime, time_t * timeoutP);
 lwm2m_status_t registration_getStatus(lwm2m_context_t * contextP);
+#ifdef LWM2M_CLIENT_MODE
+int registration_getMandatoryInfo(lwm2m_object_t * objectP, uint16_t instanceID, lwm2m_server_t * targetP);
+#endif
 
 // defined in packet.c
 uint8_t message_send(lwm2m_context_t * contextP, coap_packet_t * message, void * sessionH);
@@ -401,7 +404,6 @@ size_t utils_base64Encode(const uint8_t * dataP, size_t dataLen, uint8_t * buffe
 size_t utils_base64GetDecodedSize(const char * dataP, size_t dataLen);
 size_t utils_base64Decode(const char * dataP, size_t dataLen, uint8_t * bufferP, size_t bufferLen);
 #ifdef LWM2M_CLIENT_MODE
-int utils_getMandatoryInfo(lwm2m_object_t * objectP, uint16_t instanceID, lwm2m_server_t * targetP);
 lwm2m_server_t * utils_findServer(lwm2m_context_t * contextP, void * fromSessionH);
 lwm2m_server_t * utils_findBootstrapServer(lwm2m_context_t * contextP, void * fromSessionH);
 #endif
