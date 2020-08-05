@@ -846,7 +846,7 @@ int object_getServers(lwm2m_context_t * contextP, bool checkOnly)
                 else
                 {
                     targetP->servObjInstID = serverInstP->id;
-                    if (0 != utils_getMandatoryInfo(serverObjP, serverInstP->id, targetP))
+                    if (0 != registration_getMandatoryInfo(serverObjP, serverInstP->id, targetP))
                     {
                         lwm2m_free(targetP);
                         lwm2m_data_free(size, dataP);
