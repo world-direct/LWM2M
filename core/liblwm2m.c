@@ -98,7 +98,6 @@ static void prv_deleteServer(lwm2m_server_t * serverP, void *userData)
     {
         lwm2m_free(serverP->location);
     }
-    free_block1_buffer(serverP->block1Data);
     lwm2m_free(serverP);
 }
 
@@ -121,7 +120,6 @@ static void prv_deleteBootstrapServer(lwm2m_server_t * serverP, void *userData)
     {
          lwm2m_close_connection(serverP->sessionH, userData);
     }
-    free_block1_buffer(serverP->block1Data);
     lwm2m_free(serverP);
 }
 
@@ -475,6 +473,7 @@ next_step:
 
     registration_step(contextP, tv_sec, timeoutP);
     transaction_step(contextP, tv_sec, timeoutP);
+    block1_step(contextP, tv_sec, timeoutP);
 
     LOG_ARG("Final timeoutP: %" PRId64, *timeoutP);
 #ifdef LWM2M_CLIENT_MODE

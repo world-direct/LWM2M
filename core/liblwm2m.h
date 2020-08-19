@@ -495,20 +495,6 @@ typedef enum
 #define BINDING_UQS (BINDING_U|BINDING_Q|BINDING_S) // UDP queue mode plus SMS
 typedef uint8_t lwm2m_binding_t;
 
-/*
- * LWM2M block1 data
- *
- * Temporary data needed to handle block1 request.
- * Currently support only one block1 request by server.
- */
-typedef struct _lwm2m_block1_data_ lwm2m_block1_data_t;
-
-struct _lwm2m_block1_data_
-{
-    uint8_t *             block1buffer;     // data buffer
-    size_t                block1bufferSize; // buffer size
-    uint16_t              lastmid;          // mid of the last message received
-};
 
 typedef struct _lwm2m_server_
 {
@@ -522,7 +508,6 @@ typedef struct _lwm2m_server_
     lwm2m_status_t          status;
     char *                  location;
     bool                    dirty;
-    lwm2m_block1_data_t *   block1Data;   // buffer to handle block1 data, should be replace by a list to support several block1 transfer by server.
     uint16_t                servObjInstID;// Server object instance ID if not a bootstrap server.
 #ifndef LWM2M_VERSION_1_0
     uint8_t                 attempt;      // Current registration attempt
@@ -705,6 +690,26 @@ typedef enum
 typedef int (*lwm2m_bootstrap_callback_t) (void * sessionH, uint8_t status, lwm2m_uri_t * uriP, char * name, void * userData);
 #endif
 
+//callback should return NO_ERROR if everything was okay, COAP_413_ENTITY_TOO_LARGE if there is no space left or COAP_500_INTERNAL_SERVER_ERROR on failure
+typedef uint8_t (*lwm2m_block1_write_callback) (void * peer, uint8_t blockMore, uint8_t * * buffer, size_t * size, void * userData);
+
+typedef struct _lwm2m_block1_peer_list{
+    struct _lwm2m_block1_peer_list * next;
+    void * peer;
+    uint8_t * buffer;
+    uint32_t lastBlockNum;
+    time_t timeout;
+    uint16_t lastMid;
+} lwm2m_block1_peer_list;
+
+typedef struct _lwm2m_block1_write_handler{
+    struct _lwm2m_block1_write_handler * next;
+    lwm2m_block1_write_callback callback;
+    void * userData;
+    char * uri;
+    lwm2m_block1_peer_list * peerList; 
+}lwm2m_block1_write_handler;
+
 struct _lwm2m_context_
 {
 #ifdef LWM2M_CLIENT_MODE
@@ -726,6 +731,7 @@ struct _lwm2m_context_
     lwm2m_bootstrap_callback_t bootstrapCallback;
     void *                     bootstrapUserData;
 #endif
+    lwm2m_block1_write_handler * block1HandlerList;
     uint16_t                nextMID;
     lwm2m_transaction_t *   transactionList;
     void *                  userData;
@@ -750,6 +756,7 @@ void lwm2m_handle_packet(lwm2m_context_t * contextP, uint8_t * buffer, int lengt
 int lwm2m_configure(lwm2m_context_t * contextP, const char * endpointName, const char * msisdn, const char * altPath, uint16_t numObject, lwm2m_object_t * objectList[]);
 int lwm2m_add_object(lwm2m_context_t * contextP, lwm2m_object_t * objectP);
 int lwm2m_remove_object(lwm2m_context_t * contextP, uint16_t id);
+int lwm2m_add_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t * uri, lwm2m_block1_write_callback callback, void* userData);
 
 // send a registration update to the server specified by the server short identifier
 // or all if the ID is 0.
@@ -768,10 +775,14 @@ void lwm2m_resource_value_changed(lwm2m_context_t * contextP, lwm2m_uri_t * uriP
 // The lwm2m_client_t is present in the lwm2m_context_t's clientList when the callback is called. On a deregistration, it deleted when the callback returns.
 void lwm2m_set_monitoring_callback(lwm2m_context_t * contextP, lwm2m_result_callback_t callback, void * userData);
 
+//if buffer == 0, size is error code
+typedef int (*lwm2m_blockwise_buffer_callback) (uint32_t lastSentByte, uint8_t * buffer, uint16_t size, void * userData);
+
 // Device Management APIs
 int lwm2m_dm_read(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_discover(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_write(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, uint8_t * buffer, int length, lwm2m_result_callback_t callback, void * userData);
+int lwm2m_dm_write_block1(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, uint32_t completeSize, lwm2m_blockwise_buffer_callback callback, void * userData);
 int lwm2m_dm_write_attributes(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_attributes_t * attrP, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_execute(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, uint8_t * buffer, int length, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_create(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, uint8_t * buffer, int length, lwm2m_result_callback_t callback, void * userData);

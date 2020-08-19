@@ -274,6 +274,7 @@ typedef enum
 
 // defined in uri.c
 lwm2m_request_type_t uri_decode(char * altPath, multi_option_t *uriPath, lwm2m_uri_t *uriP);
+char * uriPathToString(multi_option_t * uriPath);
 int uri_getNumber(uint8_t * uriString, size_t uriLength);
 int uri_toString(const lwm2m_uri_t * uriP, uint8_t * buffer, size_t bufferLen, uri_depth_t * depthP);
 
@@ -374,10 +375,22 @@ int json_findAndCheckData(const lwm2m_uri_t * uriP, uri_depth_t level, size_t si
 int discover_serialize(lwm2m_context_t * contextP, lwm2m_uri_t * uriP, lwm2m_server_t * serverP, int size, lwm2m_data_t * dataP, uint8_t ** bufferP);
 
 // defined in block1.c
-uint8_t coap_block1_handler(lwm2m_block1_data_t ** block1Data, uint16_t mid, uint8_t * buffer, size_t length, uint16_t blockSize, uint32_t blockNum, bool blockMore, uint8_t ** outputBuffer, size_t * outputLength);
-void free_block1_buffer(lwm2m_block1_data_t * block1Data);
+uint8_t coap_block1_handler(lwm2m_context_t * contextP, void * peer, char * uri, uint16_t mid, uint8_t * buffer, size_t length, uint16_t blockSize, uint32_t blockNum, bool blockMore, uint8_t ** outputBuffer, size_t * outputLength);
+void block1_step(lwm2m_context_t * contextP, time_t currentTime, time_t * timeoutP);
 
+typedef struct _lwm2m_internal_list_t {
+    struct _lwm2m_internal_list_t * next;
+} lwm2m_internal_list_t;
+
+typedef uint8_t (*lwm2m_list_pred) (lwm2m_internal_list_t * node, void * userData);
 // defined in utils.c
+#define LWM2M_INTERNAL_LIST_ADD(head,node) utils_addToList((lwm2m_internal_list_t *)head,(lwm2m_internal_list_t *)node)
+#define LWM2M_INTERNAL_LIST_RM(head,node) utils_removeFromList((lwm2m_internal_list_t *)head,(lwm2m_internal_list_t *)node)
+#define LWM2M_INTERNAL_LIST_FIND(head,pred,userData) utils_findInList((lwm2m_internal_list_t *)head,pred,(void*)userData)
+lwm2m_internal_list_t * utils_addToList(lwm2m_internal_list_t * head, lwm2m_internal_list_t* node);
+lwm2m_internal_list_t * utils_findInList(lwm2m_internal_list_t * head, lwm2m_list_pred pred, void * userData);
+lwm2m_internal_list_t * utils_removeFromList(lwm2m_internal_list_t * head, lwm2m_internal_list_t * node);
+
 lwm2m_data_type_t utils_depthToDatatype(uri_depth_t depth);
 lwm2m_version_t utils_stringToVersion(uint8_t *buffer, size_t length);
 lwm2m_binding_t utils_stringToBinding(uint8_t *buffer, size_t length);

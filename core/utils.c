@@ -53,6 +53,30 @@
 #include <stdio.h>
 #include <float.h>
 
+lwm2m_internal_list_t * utils_addToList(lwm2m_internal_list_t * head, lwm2m_internal_list_t* node) {
+    if(head==NULL) return node;
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr->next != NULL) ptr = ptr->next;
+    ptr->next = node;
+    return head;
+}
+lwm2m_internal_list_t * utils_findInList(lwm2m_internal_list_t * head, lwm2m_list_pred pred, void * userData) {
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr != NULL && pred(ptr,userData) == 0){
+        ptr = ptr->next;
+    }
+    return ptr;
+}
+lwm2m_internal_list_t * utils_removeFromList(lwm2m_internal_list_t * head, lwm2m_internal_list_t * node) {
+    if(head == node) return node->next;
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr != NULL && ptr->next != node){
+        ptr = ptr->next;
+    }
+    if(ptr != NULL) ptr->next = node->next;
+    return head;
+}
+
 int utils_textToInt(const uint8_t * buffer,
                     int length,
                     int64_t * dataP)
