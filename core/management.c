@@ -291,8 +291,8 @@ uint8_t dm_handleRequest(lwm2m_context_t * contextP,
 
                     lwm2m_update_registration(contextP, 0, true);
                 }
-            }
-            else if (!LWM2M_URI_IS_SET_RESOURCE(uriP))
+            }                                           // add this fix if firmware should be posted as specification example of firmware describes...
+            else if (!LWM2M_URI_IS_SET_RESOURCE(uriP) ) //|| (IS_OPTION(message, COAP_OPTION_BLOCK1) && LWM2M_URI_IS_SET_RESOURCE(uriP))
             {
                 result = object_write(contextP, uriP, format, message->payload, message->payload_len);
             }

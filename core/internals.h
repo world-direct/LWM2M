@@ -377,6 +377,7 @@ int discover_serialize(lwm2m_context_t * contextP, lwm2m_uri_t * uriP, lwm2m_ser
 // defined in block1.c
 uint8_t coap_block1_handler(lwm2m_context_t * contextP, void * peer, char * uri, uint16_t mid, uint8_t * buffer, size_t length, uint16_t blockSize, uint32_t blockNum, bool blockMore, uint8_t ** outputBuffer, size_t * outputLength);
 void block1_step(lwm2m_context_t * contextP, time_t currentTime, time_t * timeoutP);
+void block1_handler_free(lwm2m_block1_write_handler * handler);
 
 typedef struct _lwm2m_internal_list_t {
     struct _lwm2m_internal_list_t * next;

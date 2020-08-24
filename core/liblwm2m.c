@@ -167,6 +167,14 @@ void prv_deleteTransactionList(lwm2m_context_t * context)
     }
 }
 
+void prv_deleteBlock1HandlerList(lwm2m_context_t * context) {
+    while(context->block1HandlerList != NULL){
+        lwm2m_block1_write_handler * handler = context->block1HandlerList;
+        context->block1HandlerList = handler->next;
+        block1_handler_free(handler);
+    }
+}
+
 void lwm2m_close(lwm2m_context_t * contextP)
 {
 #ifdef LWM2M_CLIENT_MODE
@@ -187,7 +195,7 @@ void lwm2m_close(lwm2m_context_t * contextP)
     }
 
 #endif
-
+    
 #ifdef LWM2M_SERVER_MODE
     while (NULL != contextP->clientList)
     {
@@ -199,7 +207,7 @@ void lwm2m_close(lwm2m_context_t * contextP)
         registration_freeClient(clientP);
     }
 #endif
-
+    prv_deleteBlock1HandlerList(contextP);
     prv_deleteTransactionList(contextP);
     lwm2m_free(contextP);
 }

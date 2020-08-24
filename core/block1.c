@@ -112,8 +112,15 @@ static uint8_t getPeerFromListPred(lwm2m_internal_list_t * node, void * peer) {
 static uint8_t default_coap_block1_handler(void * peer, uint8_t blockMore, uint8_t * * buffer, size_t * size, void * userData)
 {
     block1_data_t * block1DataList = (block1_data_t*)userData;
+    //callbacks only get called with peer == NULL when handler will get removed
+    //before callback will be called with each peer but buffer == NULL to clear peer related data
+    if(peer == NULL) {
+        lwm2m_free(userData);
+        return COAP_NO_ERROR;
+    }
+
     block1_data_list_t * block1DataP = FIND_FROM_DATA_LIST_PEER(block1DataList->list,peer);
-    if(block1DataP == NULL){
+    if(block1DataP == NULL && buffer != NULL){
         block1DataP = lwm2m_malloc(sizeof(block1_data_list_t));
         if(block1DataP == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
         memset(block1DataP,0,sizeof(block1_data_list_t));
@@ -121,12 +128,13 @@ static uint8_t default_coap_block1_handler(void * peer, uint8_t blockMore, uint8
         block1DataList->list = ADD_TO_DATA_LIST(block1DataList->list,block1DataP);
     }
     //error or timeout occured
-    if(buffer == NULL){
+    if(block1DataP != NULL && buffer == NULL){
         block1DataList->list = RM_FROM_DATA_LIST(block1DataList->list,block1DataP);
         if(block1DataP->buffer != NULL) lwm2m_free(block1DataP->buffer);
         lwm2m_free(block1DataP);
         return COAP_NO_ERROR;
     }
+    else if(buffer == NULL) return COAP_NO_ERROR;
 
     if(block1DataP->bufferLen + *size > MAX_BLOCK1_SIZE) {
         if(block1DataP->buffer != NULL) lwm2m_free(block1DataP->buffer);
@@ -148,8 +156,8 @@ static uint8_t default_coap_block1_handler(void * peer, uint8_t blockMore, uint8
     memcpy(buf+block1DataP->bufferLen,*buffer,*size);
     if(block1DataP->buffer != NULL) {
         lwm2m_free(block1DataP->buffer);
-        block1DataP->buffer = buf;
     }
+    block1DataP->buffer = buf;
     block1DataP->bufferLen += *size;
 
     if(blockMore){
@@ -229,7 +237,7 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
             if(serverData == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
             memset(serverData,0,sizeof(lwm2m_block1_peer_list));
             serverData->peer = peer;
-            serverData->timeout = lwm2m_gettime() + COAP_EXCHANGE_LIFETIME;
+            serverData->timeout = lwm2m_gettime() + COAP_DEFAULT_MAX_AGE;
             serverData->lastMid = mid;
             handler->peerList = ADD_TO_PEER_LIST(handler->peerList,serverData);
         }
@@ -258,7 +266,7 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
 
         serverData->lastMid = mid;
         serverData->lastBlockNum = blockNum;
-        serverData->timeout = lwm2m_gettime() + COAP_EXCHANGE_LIFETIME;
+        serverData->timeout = lwm2m_gettime() + COAP_DEFAULT_MAX_AGE;
     }
 
     coap_ret = handler->callback(peer,blockMore,bufferP,bufferLength,handler->userData);
@@ -273,18 +281,33 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
     }
     else
     {
-        // buffer is full, set output parameter
-        // we don't free it to be able to send retransmission
+        // all chunks are received
+        // returned buffer will be handled by wakaama (must be heap allocated!)
         serverData->buffer = *bufferP;
         *outputLength = *bufferLength;
         *outputBuffer = *bufferP;
-        //should be removed with next step
-        serverData->timeout = lwm2m_gettime();
+        //should be removed asap but wait for possible retransmissions
+        serverData->timeout = lwm2m_gettime() + COAP_RESPONSE_TIMEOUT;
 
         return NO_ERROR;
     }
 }
 
+void block1_handler_free(lwm2m_block1_write_handler * handler) {
+    lwm2m_free(handler->uri);
+    while(handler->peerList != NULL){
+        lwm2m_block1_peer_list * peer = handler->peerList;
+        handler->peerList = peer->next;
+        //call with invalid data to clear buffers of peer
+        handler->callback(peer->peer,0,0,0,handler->userData);
+        if(peer->buffer != NULL) lwm2m_free(peer->buffer);
+        lwm2m_free(peer);
+    }
+
+    //notify to clear userdata if needed!
+    handler->callback(0,0,0,0,handler->userData);
+    lwm2m_free(handler);
+}
 
 #ifdef LWM2M_CLIENT_MODE
 
@@ -330,7 +353,7 @@ void block1_step(lwm2m_context_t * contextP, time_t currentTime, time_t * timeou
             //received data got invalid, free buffers
             if(peerP->timeout <= currentTime){
                 lwm2m_block1_peer_list * toRm = peerP;
-                //call with invalid data to clear all buffers
+                //call with invalid data to clear buffers of peer
                 handler->callback(peerP->peer,0,0,0,handler->userData);
                 peerP = peerP->next;
                 handler->peerList = RM_FROM_PEER_LIST(handler->peerList,toRm);
@@ -347,9 +370,8 @@ void block1_step(lwm2m_context_t * contextP, time_t currentTime, time_t * timeou
             lwm2m_block1_write_handler * toRm = handler;
             handler = handler->next;
             contextP->block1HandlerList = RM_FROM_HANDLER_LIST(contextP->block1HandlerList,toRm);
-            lwm2m_free(toRm->uri);
-            lwm2m_free(toRm->userData);
-            lwm2m_free(toRm);
+            block1_handler_free(toRm);
+            
         }
         else {
             handler = handler->next;
@@ -369,6 +391,8 @@ typedef struct
     uint32_t completeSize;
     lwm2m_blockwise_buffer_callback callback;
     void * userData;
+    lwm2m_result_callback_t resultCallback;
+    void * resultUserData;
     lwm2m_uri_t uri;
 } blockwise_data_t;
 
@@ -380,12 +404,16 @@ static void prv_resultCallback(lwm2m_context_t * contextP,
 static int createBlockWiseTransaction(lwm2m_context_t * contextP,
                                         lwm2m_client_t * clientP,
                                         lwm2m_uri_t * uriP,
+                                        coap_method_t method,
+                                        lwm2m_media_type_t format,
                                         uint32_t completeSize,
                                         uint16_t chunkSize,
                                         uint32_t bytesSent,
                                         uint32_t chunkNum,
                                         lwm2m_blockwise_buffer_callback callback,
-                                        void * userData)
+                                        void * userData,
+                                        lwm2m_result_callback_t resultCallback, 
+                                        void * resultUserData)
 {
     
     lwm2m_transaction_t * transaction;
@@ -412,18 +440,18 @@ static int createBlockWiseTransaction(lwm2m_context_t * contextP,
 
     if(bytesSent + currentChunkSize < completeSize) more = 1;
 
-    transaction = transaction_new(clientP->sessionH, COAP_POST, clientP->altPath, uriP, contextP->nextMID++, 4, NULL);
+    transaction = transaction_new(clientP->sessionH, method, clientP->altPath, uriP, contextP->nextMID++, 4, NULL);
     if (transaction == NULL) 
     {
         lwm2m_free(chunk);
         return COAP_500_INTERNAL_SERVER_ERROR;
     }
-
+    coap_set_header_content_type(transaction->message, format);
     ret = coap_set_header_block1(transaction->message, chunkNum, more, chunkSize);
     if(ret == 0)
     {
         lwm2m_free(chunk);
-        lwm2m_free(transaction);
+        transaction_free(transaction);
         return COAP_406_NOT_ACCEPTABLE;
     }
 
@@ -433,7 +461,7 @@ static int createBlockWiseTransaction(lwm2m_context_t * contextP,
     if(data == NULL)
     {
         lwm2m_free(chunk);
-        lwm2m_free(transaction);
+        transaction_free(transaction);
         return COAP_500_INTERNAL_SERVER_ERROR;
     }
     data->bytesSent = bytesSent + currentChunkSize;
@@ -442,6 +470,8 @@ static int createBlockWiseTransaction(lwm2m_context_t * contextP,
     data->completeSize = completeSize;
     data->callback = callback;
     data->userData = userData;
+    data->resultCallback = resultCallback;
+    data->resultUserData = resultUserData;
     memcpy(&data->uri,uriP,sizeof(lwm2m_uri_t));
 
     transaction->userData = data;
@@ -472,6 +502,9 @@ void prv_resultCallback(lwm2m_context_t * contextP,
     if(message == NULL){
         //block transfer can be terminated because of error
         dataP->callback(0,0,COAP_500_INTERNAL_SERVER_ERROR,dataP->userData);
+        if(dataP->resultCallback != NULL) {
+            dataP->resultCallback(dataP->clientID,&dataP->uri, COAP_503_SERVICE_UNAVAILABLE, LWM2M_CONTENT_TEXT, NULL, 0, dataP->resultUserData);
+        }
     }
     else {
         coap_packet_t * packet = (coap_packet_t *)message;
@@ -483,10 +516,16 @@ void prv_resultCallback(lwm2m_context_t * contextP,
         else if(packet->code == COAP_204_CHANGED) {
             //block transfer can be terminated
             dataP->callback(dataP->bytesSent,0,0,dataP->userData);
+            if(dataP->resultCallback != NULL) {
+                dataP->resultCallback(dataP->clientID,&dataP->uri, packet->code, utils_convertMediaType(packet->content_type), packet->payload, packet->payload_len, dataP->resultUserData);
+            }
         }
         else {
             //block transfer can be terminated because of error
             dataP->callback(0,0,packet->code,dataP->userData);
+            if(dataP->resultCallback != NULL) {
+                dataP->resultCallback(dataP->clientID,&dataP->uri, packet->code, utils_convertMediaType(packet->content_type), packet->payload, packet->payload_len, dataP->resultUserData);
+            }
         }
     }
     
@@ -498,11 +537,13 @@ void prv_resultCallback(lwm2m_context_t * contextP,
             dataP->callback(0,0,COAP_404_NOT_FOUND,dataP->userData);
             return;
         }
-        createBlockWiseTransaction( contextP,clientP, &dataP->uri,
+        createBlockWiseTransaction( contextP,clientP,
+                                    &dataP->uri, ((coap_packet_t*)transacP->message)->code,
+                                    utils_convertMediaType(((coap_packet_t*)transacP->message)->content_type),
                                     dataP->completeSize,
                                     chunkLength,dataP->bytesSent,
                                     dataP->lastChunkNum + 1,
-                                    dataP->callback, dataP->userData);
+                                    dataP->callback, dataP->userData, dataP->resultCallback, dataP->resultUserData);
     }
     lwm2m_free(dataP);
 }
@@ -510,15 +551,26 @@ void prv_resultCallback(lwm2m_context_t * contextP,
 
 int lwm2m_dm_write_block1(lwm2m_context_t * contextP, 
                          uint16_t clientID,
+                         lwm2m_media_type_t format,
                          lwm2m_uri_t * uriP,
                          uint32_t completeSize,
                          lwm2m_blockwise_buffer_callback callback, 
-                         void * userData)
+                         void * userData,
+                         lwm2m_result_callback_t resultCallback, 
+                         void * resultUserData)
 {
     lwm2m_client_t * clientP;
+    if(uriP == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+    if(!LWM2M_URI_IS_SET_OBJECT(uriP)) return COAP_500_INTERNAL_SERVER_ERROR;
+    if(!LWM2M_URI_IS_SET_INSTANCE(uriP)) return COAP_500_INTERNAL_SERVER_ERROR;
     clientP = (lwm2m_client_t *)lwm2m_list_find((lwm2m_list_t *)contextP->clientList, clientID);
     if (clientP == NULL) return COAP_404_NOT_FOUND;
-    return createBlockWiseTransaction(contextP,clientP,uriP,completeSize,REST_MAX_CHUNK_SIZE,0,0,callback,userData);
+    coap_method_t method = COAP_POST;
+    if(LWM2M_URI_IS_SET_RESOURCE(uriP)){
+        method = COAP_PUT;
+    }
+
+    return createBlockWiseTransaction(contextP,clientP,uriP,method,format,completeSize,REST_MAX_CHUNK_SIZE,0,0,callback,userData,resultCallback,resultUserData);
 }
 
 #endif
