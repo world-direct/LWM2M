@@ -991,7 +991,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
         {
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
-        if(prv_getRegistrationUpdateQuery(contextP, server, query, query_length, bindingChanged, lifetimeChanged, false) != query_length) {
+        if(prv_getRegistrationUpdateQuery(contextP, server, (char*)query, query_length, bindingChanged, lifetimeChanged, false) != query_length) {
             lwm2m_free(query);
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
@@ -999,7 +999,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
 
     transaction = transaction_new(server->sessionH, COAP_POST, NULL, NULL, contextP->nextMID++, 4, NULL);
     if (transaction == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
-    if (query) coap_set_header_uri_query(transaction->message, query);
+    if (query) coap_set_header_uri_query(transaction->message, (char*)query);
 
     coap_set_header_uri_path(transaction->message, server->location);
 

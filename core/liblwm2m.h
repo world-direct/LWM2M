@@ -691,13 +691,14 @@ typedef int (*lwm2m_bootstrap_callback_t) (void * sessionH, uint8_t status, lwm2
 #endif
 
 //callback should return NO_ERROR if everything was okay, COAP_413_ENTITY_TOO_LARGE if there is no space left or COAP_500_INTERNAL_SERVER_ERROR on failure
+//if blockmore == false you could return any result code, if you want to forward data to your resource, set buffer and size accordingly and return COAP_NO_ERROR
 typedef uint8_t (*lwm2m_block1_write_callback) (void * peer, uint8_t blockMore, uint8_t * * buffer, size_t * size, void * userData);
 
 typedef struct _lwm2m_block1_peer_list{
     struct _lwm2m_block1_peer_list * next;
     void * peer;
     uint8_t * buffer;
-    uint32_t lastBlockNum;
+    uint64_t receivedSize;
     time_t timeout;
     uint16_t lastMid;
 } lwm2m_block1_peer_list;
@@ -757,7 +758,7 @@ int lwm2m_configure(lwm2m_context_t * contextP, const char * endpointName, const
 int lwm2m_add_object(lwm2m_context_t * contextP, lwm2m_object_t * objectP);
 int lwm2m_remove_object(lwm2m_context_t * contextP, uint16_t id);
 int lwm2m_add_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t * uri, lwm2m_block1_write_callback callback, void* userData);
-
+int lwm2m_remove_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t* uri);
 // send a registration update to the server specified by the server short identifier
 // or all if the ID is 0.
 // If withObjects is true, the registration update contains the object list.

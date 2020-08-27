@@ -239,15 +239,20 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
             serverData->peer = peer;
             serverData->timeout = lwm2m_gettime() + COAP_DEFAULT_MAX_AGE;
             serverData->lastMid = mid;
+            serverData->receivedSize = blockSize;
             handler->peerList = ADD_TO_PEER_LIST(handler->peerList,serverData);
         }
         //new transmission started without end of last transmission
-        else {
+        else if(serverData->lastMid != mid){
             handler->callback(peer,0,0,0,handler->userData);
             handler->peerList = RM_FROM_PEER_LIST(handler->peerList,serverData);
             lwm2m_free(serverData);
             return COAP_408_REQ_ENTITY_INCOMPLETE;
         }
+        else {
+            return NO_ERROR;
+        }
+        
     }
     else {
         //we never received first block
@@ -258,19 +263,25 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
         if(serverData->lastMid == mid) {
             return NO_ERROR;
         }
-        //we did not received messages in correct order
-        if(serverData->lastBlockNum + 1 != blockNum){
-            return COAP_408_REQ_ENTITY_INCOMPLETE;
+        if(blockMore){
+            if(serverData->receivedSize + blockSize != (blockNum+1)*blockSize){
+                //we did not received messages in correct order
+                return COAP_408_REQ_ENTITY_INCOMPLETE;
+            }
         }
+        
+        
 
 
         serverData->lastMid = mid;
-        serverData->lastBlockNum = blockNum;
+        serverData->receivedSize += blockSize;
         serverData->timeout = lwm2m_gettime() + COAP_DEFAULT_MAX_AGE;
     }
 
     coap_ret = handler->callback(peer,blockMore,bufferP,bufferLength,handler->userData);
     if(coap_ret == COAP_500_INTERNAL_SERVER_ERROR || coap_ret == COAP_413_ENTITY_TOO_LARGE){
+        //clean up asap
+        serverData->timeout = lwm2m_gettime();
         return coap_ret;
     }
 
@@ -289,7 +300,7 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
         //should be removed asap but wait for possible retransmissions
         serverData->timeout = lwm2m_gettime() + COAP_RESPONSE_TIMEOUT;
 
-        return NO_ERROR;
+        return coap_ret;
     }
 }
 
@@ -314,6 +325,8 @@ void block1_handler_free(lwm2m_block1_write_handler * handler) {
 int lwm2m_add_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t * uri, lwm2m_block1_write_callback callback, void* userData) {
     uint8_t uriString[URI_MAX_STRING_LEN+1];
     lwm2m_block1_write_handler * handler = NULL;
+    if(callback == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+    if(uri == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
     if(!LWM2M_URI_IS_SET_OBJECT(uri) || !LWM2M_URI_IS_SET_INSTANCE(uri) || !LWM2M_URI_IS_SET_RESOURCE(uri)) return COAP_500_INTERNAL_SERVER_ERROR;
     if(FIND_FROM_HANDLER_LIST_DM_URI(contextP->block1HandlerList,uri) != NULL) return COAP_500_INTERNAL_SERVER_ERROR;
 
@@ -334,6 +347,16 @@ int lwm2m_add_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t * uri, lwm2
 
     contextP->block1HandlerList = ADD_TO_HANDLER_LIST(contextP->block1HandlerList,handler);
 
+    return COAP_NO_ERROR;
+}
+
+int lwm2m_remove_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t* uri) {
+    if(uri == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+    if(!LWM2M_URI_IS_SET_OBJECT(uri) || !LWM2M_URI_IS_SET_INSTANCE(uri) || !LWM2M_URI_IS_SET_RESOURCE(uri)) return COAP_500_INTERNAL_SERVER_ERROR;
+    lwm2m_block1_write_handler * handler = FIND_FROM_HANDLER_LIST_DM_URI(contextP->block1HandlerList,uri);
+    if(handler == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+    contextP->block1HandlerList = RM_FROM_HANDLER_LIST(contextP->block1HandlerList,handler);
+    block1_handler_free(handler);
     return COAP_NO_ERROR;
 }
 
@@ -512,6 +535,7 @@ void prv_resultCallback(lwm2m_context_t * contextP,
             uint16_t block1_size;
             coap_get_header_block1(packet, NULL, NULL, &block1_size, NULL);
             chunkLength = MIN(block1_size,REST_MAX_CHUNK_SIZE);
+            dataP->lastChunkNum = dataP->bytesSent/chunkLength; //update chunkNum accordingly
         }
         else if(packet->code == COAP_204_CHANGED) {
             //block transfer can be terminated
