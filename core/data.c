@@ -602,6 +602,35 @@ void lwm2m_data_encode_objlink(uint16_t objectId,
     dataP->value.asObjLink.objectInstanceId = objectInstanceId;
 }
 
+int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, lwm2m_data_t * dataP) {
+    int result = 0;
+    switch(dataP->type) {
+        case LWM2M_TYPE_OPAQUE:
+            if(dataP->value.asBuffer.length == 4){
+                *objectId = dataP->value.asBuffer.buffer[0] << 8 | dataP->value.asBuffer.buffer[1];
+                *objectInstanceId = dataP->value.asBuffer.buffer[2] << 8 | dataP->value.asBuffer.buffer[3];
+                result = 1;
+            }
+            
+        break;
+
+        case LWM2M_TYPE_STRING:
+            if(utils_textToObjLink(dataP->value.asBuffer.buffer,dataP->value.asBuffer.length,objectId,objectInstanceId)){
+                result = 1;
+            }
+        break;
+
+        case LWM2M_TYPE_CORE_LINK:
+            result = 1;
+        break;
+        
+        default:
+            result = 0;
+    }
+
+    return result;
+}
+
 void lwm2m_data_include(lwm2m_data_t * subDataP,
                         size_t count,
                         lwm2m_data_t * dataP)
