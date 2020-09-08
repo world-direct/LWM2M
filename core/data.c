@@ -620,7 +620,7 @@ int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, 
             }
         break;
 
-        case LWM2M_TYPE_CORE_LINK:
+        case LWM2M_TYPE_OBJECT_LINK:
             result = 1;
         break;
         
