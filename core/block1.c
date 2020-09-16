@@ -250,7 +250,7 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
             return COAP_408_REQ_ENTITY_INCOMPLETE;
         }
         else {
-            return NO_ERROR;
+            return COAP_231_CONTINUE;
         }
         
     }
@@ -261,7 +261,7 @@ uint8_t coap_block1_handler(lwm2m_context_t * contextP,
         }
         //we have already received this message
         if(serverData->lastMid == mid) {
-            return NO_ERROR;
+            return COAP_231_CONTINUE;
         }
         if(blockMore){
             if(serverData->receivedSize + blockSize != (blockNum+1)*blockSize){
@@ -535,7 +535,7 @@ void prv_resultCallback(lwm2m_context_t * contextP,
             uint16_t block1_size;
             coap_get_header_block1(packet, NULL, NULL, &block1_size, NULL);
             chunkLength = MIN(block1_size,REST_MAX_CHUNK_SIZE);
-            dataP->lastChunkNum = dataP->bytesSent/chunkLength; //update chunkNum accordingly
+            dataP->lastChunkNum = dataP->bytesSent/chunkLength - 1; //update chunkNum accordingly
         }
         else if(packet->code == COAP_204_CHANGED) {
             //block transfer can be terminated
