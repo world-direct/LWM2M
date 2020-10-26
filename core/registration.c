@@ -2075,11 +2075,14 @@ void registration_step(lwm2m_context_t * contextP,
             }
 
             interval = targetP->registration + nextUpdate - currentTime;
-            if (0 >= interval)
+            // special case, send registration update if interval > lifetime,
+            // this happens if time of device was set into the past
+            if (0 >= interval || interval > targetP->lifetime)
             {
                 LOG_ARG("%d Updating registration", targetP->shortID);
                 prv_updateRegistration(contextP, targetP, false);
             }
+            
             else if (interval < *timeoutP)
             {
                 *timeoutP = interval;
