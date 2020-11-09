@@ -622,6 +622,8 @@ int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, 
 
         case LWM2M_TYPE_OBJECT_LINK:
             result = 1;
+            *objectId = dataP->value.asObjLink.objectId;
+            *objectInstanceId = dataP->value.asObjLink.objectInstanceId;
         break;
         
         default:
