@@ -95,16 +95,17 @@ static int prv_textSerialize(lwm2m_data_t * dataP,
     {
         char stringBuffer[11];
         size_t length;
+		res = 0;
         
-        length = utils_intToText(dataP->value.asObjLink.objectId, (uint8_t*)stringBuffer, 5);
+        length = utils_intToText(dataP->value.asObjLink.objectId, (uint8_t*)stringBuffer + res, 5);
         if (length == 0) return -1;
+		res += length;
 
-        stringBuffer[5] = ':';
-        res = length + 1;
+        stringBuffer[res] = ':';
+        res += 1;
 
         length = utils_intToText(dataP->value.asObjLink.objectInstanceId, (uint8_t*)stringBuffer + res, 5);
         if (length == 0) return -1;
-
         res += length;
 
         *bufferP = (uint8_t *)lwm2m_malloc(res);
