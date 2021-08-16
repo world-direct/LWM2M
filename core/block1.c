@@ -442,7 +442,7 @@ static int createBlockWiseTransaction(lwm2m_context_t * contextP,
     lwm2m_transaction_t * transaction;
     uint8_t * chunk;
     uint16_t currentChunkSize;
-    uint8_t more;
+    uint8_t more = 0;
     blockwise_data_t * data;
     int ret;
 
