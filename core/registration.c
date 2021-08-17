@@ -2104,6 +2104,8 @@ void registration_step(lwm2m_context_t * contextP,
                 lwm2m_close_connection(targetP->sessionH, contextP->userData);
                 targetP->sessionH = NULL;
             }
+            // trigger registration again to try reconnecting to server (otherwise multiple servers are configured but only one is connected)
+            prv_register(contextP, targetP);
             break;
 
         default:
