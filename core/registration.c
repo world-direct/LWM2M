@@ -1233,7 +1233,10 @@ lwm2m_status_t registration_getStatus(lwm2m_context_t * contextP)
 
             case STATE_REG_HOLD_OFF:
             case STATE_REG_PENDING:
-                reg_status = STATE_REG_PENDING;
+                if (reg_status == STATE_REG_FAILED)
+                {
+                    reg_status = STATE_REG_PENDING;
+                }
                 break;
 
             case STATE_REG_FAILED:
