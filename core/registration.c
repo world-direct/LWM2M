@@ -2103,9 +2103,18 @@ void registration_step(lwm2m_context_t * contextP,
             {
                 lwm2m_close_connection(targetP->sessionH, contextP->userData);
                 targetP->sessionH = NULL;
+                // delay registration to enable bootstrapping on no server reachable
+                targetP->registration = currentTime + COAP_EXCHANGE_LIFETIME;
             }
-            // trigger registration again to try reconnecting to server (otherwise multiple servers are configured but only one is connected)
-            prv_register(contextP, targetP);
+            else
+            {
+                if(targetP->registration < currentTime) 
+                {
+                    // trigger registration again to try reconnecting to server (otherwise multiple servers are configured but only one is connected)
+                    prv_register(contextP, targetP);
+                }
+            }
+            
             break;
 
         default:
