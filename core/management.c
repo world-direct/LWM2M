@@ -513,8 +513,7 @@ int lwm2m_dm_write(lwm2m_context_t * contextP,
 {
     LOG_ARG("clientID: %d, format: %s, length: %d", clientID, STR_MEDIA_TYPE(format), length);
     LOG_URI(uriP);
-    if (!LWM2M_URI_IS_SET_INSTANCE(uriP)
-     || length == 0)
+    if (!LWM2M_URI_IS_SET_INSTANCE(uriP))
     {
         return COAP_400_BAD_REQUEST;
     }
