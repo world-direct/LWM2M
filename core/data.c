@@ -603,7 +603,7 @@ void lwm2m_data_encode_objlink(uint16_t objectId,
     dataP->value.asObjLink.objectInstanceId = objectInstanceId;
 }
 
-int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, lwm2m_data_t * dataP) {
+int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, lwm2m_data_t const * dataP) {
     int result = 0;
     switch(dataP->type) {
         case LWM2M_TYPE_OPAQUE:
