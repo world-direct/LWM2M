@@ -53,6 +53,29 @@
 #include <stdio.h>
 #include <float.h>
 
+lwm2m_internal_list_t * utils_addToList(lwm2m_internal_list_t * head, lwm2m_internal_list_t* node) {
+    if(head==NULL) return node;
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr->next != NULL) ptr = ptr->next;
+    ptr->next = node;
+    return head;
+}
+lwm2m_internal_list_t * utils_findInList(lwm2m_internal_list_t * head, lwm2m_list_pred pred, void * userData) {
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr != NULL && pred(ptr,userData) == 0){
+        ptr = ptr->next;
+    }
+    return ptr;
+}
+lwm2m_internal_list_t * utils_removeFromList(lwm2m_internal_list_t * head, lwm2m_internal_list_t * node) {
+    if(head == node) return node->next;
+    lwm2m_internal_list_t * ptr = head;
+    while(ptr != NULL && ptr->next != node){
+        ptr = ptr->next;
+    }
+    if(ptr != NULL) ptr->next = node->next;
+    return head;
+}
 
 int utils_textToInt(const uint8_t * buffer,
                     int length,
@@ -494,6 +517,7 @@ lwm2m_media_type_t utils_convertMediaType(coap_content_type_t type)
         break;
 #endif
     case LWM2M_CONTENT_JSON:
+    case APPLICATION_JSON: //minor bugfix because of wd lwm2m server
         result = LWM2M_CONTENT_JSON;
         break;
     case LWM2M_CONTENT_SENML_JSON:
@@ -524,6 +548,7 @@ lwm2m_server_t * utils_findServer(lwm2m_context_t * contextP,
 
     return targetP;
 }
+
 #endif
 
 lwm2m_server_t * utils_findBootstrapServer(lwm2m_context_t * contextP,

@@ -65,47 +65,63 @@
 
 #ifdef LWM2M_CLIENT_MODE
 
-static int prv_getRegistrationQueryLength(lwm2m_context_t * contextP,
-                                          lwm2m_server_t * server)
+static int prv_getRegistrationQueryLengthLifetime(int lifetime)
 {
-    int index;
+    size_t index;
     int res;
     uint8_t buffer[21];
+    index = 0;
+    if (0 != lifetime)
+    {
+        index += strlen(QUERY_DELIMITER QUERY_LIFETIME);
+        res = utils_intToText(lifetime, buffer, sizeof(buffer));
+        if (res == 0) return 0;
+        index += res;
+    }
+    return index;
+}
 
-    index = strlen(QUERY_STARTER QUERY_VERSION_FULL QUERY_DELIMITER QUERY_NAME);
-    index += strlen(contextP->endpointName);
-
+static int prv_getRegistrationQueryLengthSMS(lwm2m_context_t * contextP)
+{
+    size_t index;
+    index = 0;
     if (NULL != contextP->msisdn)
     {
         index += strlen(QUERY_DELIMITER QUERY_SMS);
         index += strlen(contextP->msisdn);
     }
+    return index;
+}
 
+static int prv_getRegistationQueryLengthBinding(lwm2m_server_t * server)
+{
+    size_t index;
 #ifdef LWM2M_VERSION_1_0
     switch (server->binding)
     {
     case BINDING_U:
-        index += strlen("&b=U");
+        index = strlen("&b=U");
         break;
     case BINDING_UQ:
-        index += strlen("&b=UQ");
+        index = strlen("&b=UQ");
         break;
     case BINDING_S:
-        index += strlen("&b=S");
+        index = strlen("&b=S");
         break;
     case BINDING_SQ:
-        index += strlen("&b=SQ");
+        index = strlen("&b=SQ");
         break;
     case BINDING_US:
-        index += strlen("&b=US");
+        index = strlen("&b=US");
         break;
     case BINDING_UQS:
-        index += strlen("&b=UQS");
+        index = strlen("&b=UQS");
         break;
     default:
         return 0;
     }
 #else
+    index = 0;
     if ((server->binding & ~(BINDING_UNKNOWN|BINDING_Q)) != 0)
     {
         index += QUERY_DELIMITER_LEN + QUERY_BINDING_LEN;
@@ -131,34 +147,72 @@ static int prv_getRegistrationQueryLength(lwm2m_context_t * contextP,
         index += QUERY_DELIMITER_LEN + QUERY_QUEUE_MODE_LEN;
     }
 #endif
+    return index;
+}
 
-    if (0 != server->lifetime)
-    {
-        index += strlen(QUERY_DELIMITER QUERY_LIFETIME);
-        res = utils_intToText(server->lifetime, buffer, sizeof(buffer));
-        if (res == 0) return 0;
+static int prv_getRegistrationUpdateQueryLength(lwm2m_context_t * contextP,
+                                                lwm2m_server_t * server,
+                                                bool bindingChanged,
+                                                bool lifetimeChanged,
+                                                bool smsNumberChanged)
+{
+    int index;
+    int res;
+
+    if(bindingChanged == 0 && lifetimeChanged == 0 && smsNumberChanged == 0){
+        return 0;
+    }
+    index = strlen(QUERY_STARTER);
+    if(bindingChanged) {
+        res = prv_getRegistationQueryLengthBinding(server);
+        if(res == 0) return 0;
         index += res;
     }
+    if(lifetimeChanged) {
+        res = prv_getRegistrationQueryLengthLifetime(server->lifetime);
+        if(res == 0) return 0;
+        index += res;
+    }
+    if(smsNumberChanged) {
+        res = prv_getRegistrationQueryLengthSMS(contextP);
+        if(res == 0) return 0;
+        index += res;
+    }
+    return index;
+}
+
+static int prv_getRegistrationQueryLength(lwm2m_context_t * contextP,
+                                          lwm2m_server_t * server)
+{
+    int index;
+    int res;
+
+    index = strlen(QUERY_STARTER QUERY_VERSION_FULL QUERY_DELIMITER QUERY_NAME);
+    index += strlen(contextP->endpointName);
+
+    res = prv_getRegistrationQueryLengthSMS(contextP);
+    if(res < 0) return 0;
+    index += res;
+
+    res = prv_getRegistationQueryLengthBinding(server);
+    if(res == 0) return 0;
+    index+=res;
+
+    res = prv_getRegistrationQueryLengthLifetime(server->lifetime);
+    if(res < 0) return 0;
+    index += res;
 
     return index + 1;
 }
 
-static int prv_getRegistrationQuery(lwm2m_context_t * contextP,
-                                    lwm2m_server_t * server,
-                                    char * buffer,
-                                    size_t length)
+static int prv_registrationQueryAddSMS(lwm2m_context_t * contextP, 
+                                       char * buffer,
+                                       size_t length)
 {
-    size_t index;
     int res;
-
-    res = utils_stringCopy(buffer, length, QUERY_STARTER QUERY_VERSION_FULL QUERY_DELIMITER QUERY_NAME);
-    if (res < 0) return 0;
-    index = res;
-    res = utils_stringCopy(buffer + index, length - index, contextP->endpointName);
-    if (res < 0) return 0;
-    index += res;
-
-    if (NULL != contextP->msisdn)
+    size_t index;
+    index = 0;
+    if(contextP->msisdn != NULL)
     {
         res = utils_stringCopy(buffer + index, length - index, QUERY_DELIMITER QUERY_SMS);
         if (res < 0) return 0;
@@ -167,7 +221,15 @@ static int prv_getRegistrationQuery(lwm2m_context_t * contextP,
         if (res < 0) return 0;
         index += res;
     }
+    return index;
+}
 
+static int prv_registrationQueryAddBinding(lwm2m_server_t * server,
+                                           char * buffer,
+                                           size_t length)
+{
+    int res;
+    size_t index = 0;
 #ifdef LWM2M_VERSION_1_0
     switch (server->binding)
     {
@@ -228,7 +290,16 @@ static int prv_getRegistrationQuery(lwm2m_context_t * contextP,
         index += res;
     }
 #endif
+    return index;
+}
 
+static int prv_registrationQueryAddLifetime(lwm2m_server_t * server,
+                                           char * buffer,
+                                           size_t length)
+{
+    int res;
+    size_t index;
+    index = 0;
     if (0 != server->lifetime)
     {
         res = utils_stringCopy(buffer + index, length - index, QUERY_DELIMITER QUERY_LIFETIME);
@@ -238,6 +309,82 @@ static int prv_getRegistrationQuery(lwm2m_context_t * contextP,
         if (res == 0) return 0;
         index += res;
     }
+    return index;
+}
+
+static int prv_getRegistrationUpdateQuery(lwm2m_context_t * contextP,
+                                          lwm2m_server_t * server,
+                                          char * buffer,
+                                          size_t length,
+                                          bool bindingChanged,
+                                          bool lifetimeChanged,
+                                          bool smsNumberChanged)
+{
+    size_t index;
+    int res;
+    if(bindingChanged == 0 && lifetimeChanged == 0 && smsNumberChanged == 0){
+        return 0;
+    }
+
+    index = strlen(QUERY_STARTER) - 1; //-1 to override first delimiter
+
+    if(bindingChanged) {
+        res = prv_registrationQueryAddBinding(server,buffer+index,length-index);
+        if(res < 0) return 0;
+        index += res;
+    }
+    if(lifetimeChanged){
+        res = prv_registrationQueryAddLifetime(server,buffer+index,length-index);
+        if(res < 0) return 0;
+        index += res;
+    }
+    if(smsNumberChanged) {
+        res = prv_registrationQueryAddSMS(contextP,buffer+index,length-index);
+        if(res < 0) return 0;
+        index += res;
+    }
+    
+
+    memcpy(buffer,QUERY_STARTER,strlen(QUERY_STARTER));
+
+    if(index < length)
+    {
+        buffer[index++] = '\0';
+    }
+    else
+    {
+        return 0;
+    }
+
+    return index;
+}
+
+static int prv_getRegistrationQuery(lwm2m_context_t * contextP,
+                                    lwm2m_server_t * server,
+                                    char * buffer,
+                                    size_t length)
+{
+    size_t index;
+    int res;
+
+    res = utils_stringCopy(buffer, length, QUERY_STARTER QUERY_VERSION_FULL QUERY_DELIMITER QUERY_NAME);
+    if (res < 0) return 0;
+    index = res;
+    res = utils_stringCopy(buffer + index, length - index, contextP->endpointName);
+    if (res < 0) return 0;
+    index += res;
+
+    res = prv_registrationQueryAddSMS(contextP,buffer+index,length-index);
+    if(res < 0) return 0;
+    index += res;
+
+    res = prv_registrationQueryAddBinding(server,buffer+index,length-index);
+    if(res < 0) return 0;
+    index += res;
+
+    res = prv_registrationQueryAddLifetime(server,buffer+index,length-index);
+    if(res < 0) return 0;
+    index += res;
 
     if(index < length)
     {
@@ -809,11 +956,50 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
                                   bool withObjects)
 {
     lwm2m_transaction_t * transaction;
+    lwm2m_object_t * servObj;
+    bool bindingChanged = false, lifetimeChanged = false;
     uint8_t * payload = NULL;
+    uint8_t * query = NULL;
     int payload_length;
+    int query_length;
+    lwm2m_binding_t oldBinding;
+    int oldLifetime;
+
+    oldBinding = server->binding;
+    oldLifetime = server->lifetime;
+
+    servObj = (lwm2m_object_t*)LWM2M_LIST_FIND(contextP->objectList,LWM2M_SERVER_OBJECT_ID);
+    if(servObj == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+
+    if (0 != registration_getMandatoryInfo(servObj, server->servObjInstID, server))
+    {
+        return COAP_500_INTERNAL_SERVER_ERROR;
+    }
+    if(oldLifetime != server->lifetime) {
+        lifetimeChanged = true;
+    }
+    if(oldBinding != server->binding) {
+        bindingChanged = true;
+    }
+    if(lifetimeChanged == true || bindingChanged == true){
+        query_length = prv_getRegistrationUpdateQueryLength(contextP, server, bindingChanged, lifetimeChanged, false);
+        if(query_length == 0) {
+            return COAP_500_INTERNAL_SERVER_ERROR;
+        }
+        query = lwm2m_malloc(query_length);
+        if(!query)
+        {
+            return COAP_500_INTERNAL_SERVER_ERROR;
+        }
+        if(prv_getRegistrationUpdateQuery(contextP, server, (char*)query, query_length, bindingChanged, lifetimeChanged, false) != query_length) {
+            lwm2m_free(query);
+            return COAP_500_INTERNAL_SERVER_ERROR;
+        }
+    }
 
     transaction = transaction_new(server->sessionH, COAP_POST, NULL, NULL, contextP->nextMID++, 4, NULL);
     if (transaction == NULL) return COAP_500_INTERNAL_SERVER_ERROR;
+    if (query) coap_set_header_uri_query(transaction->message, (char*)query);
 
     coap_set_header_uri_path(transaction->message, server->location);
 
@@ -822,6 +1008,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
         payload_length = object_getRegisterPayloadBufferLength(contextP);
         if(payload_length == 0)
         {
+            if (query) lwm2m_free(query);
             transaction_free(transaction);
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
@@ -829,6 +1016,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
         payload = lwm2m_malloc(payload_length);
         if(!payload)
         {
+            if (query) lwm2m_free(query);
             transaction_free(transaction);
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
@@ -836,6 +1024,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
         payload_length = object_getRegisterPayload(contextP, payload, payload_length);
         if(payload_length == 0)
         {
+            if (query) lwm2m_free(query);
             transaction_free(transaction);
             lwm2m_free(payload);
             return COAP_500_INTERNAL_SERVER_ERROR;
@@ -853,6 +1042,7 @@ static int prv_updateRegistration(lwm2m_context_t * contextP,
         server->status = STATE_REG_UPDATE_PENDING;
     }
 
+    if (query) lwm2m_free(query);
     if (withObjects == true)
     {
         lwm2m_free(payload);
@@ -1035,15 +1225,15 @@ lwm2m_status_t registration_getStatus(lwm2m_context_t * contextP)
             case STATE_REG_UPDATE_NEEDED:
             case STATE_REG_FULL_UPDATE_NEEDED:
             case STATE_REG_UPDATE_PENDING:
-                if (reg_status == STATE_REG_FAILED)
-                {
-                    reg_status = STATE_REGISTERED;
-                }
+                reg_status = STATE_REGISTERED;
                 break;
 
             case STATE_REG_HOLD_OFF:
             case STATE_REG_PENDING:
-                reg_status = STATE_REG_PENDING;
+                if (reg_status == STATE_REG_FAILED)
+                {
+                    reg_status = STATE_REG_PENDING;
+                }
                 break;
 
             case STATE_REG_FAILED:
@@ -1885,11 +2075,14 @@ void registration_step(lwm2m_context_t * contextP,
             }
 
             interval = targetP->registration + nextUpdate - currentTime;
-            if (0 >= interval)
+            // special case, send registration update if interval > lifetime,
+            // this happens if time of device was set into the past
+            if (0 >= interval || interval > targetP->lifetime)
             {
                 LOG_ARG("%d Updating registration", targetP->shortID);
                 prv_updateRegistration(contextP, targetP, false);
             }
+            
             else if (interval < *timeoutP)
             {
                 *timeoutP = interval;
@@ -1910,7 +2103,18 @@ void registration_step(lwm2m_context_t * contextP,
             {
                 lwm2m_close_connection(targetP->sessionH, contextP->userData);
                 targetP->sessionH = NULL;
+                // delay registration to enable bootstrapping on no server reachable
+                targetP->registration = currentTime + COAP_EXCHANGE_LIFETIME;
             }
+            else
+            {
+                if(targetP->registration < currentTime) 
+                {
+                    // trigger registration again to try reconnecting to server (otherwise multiple servers are configured but only one is connected)
+                    prv_register(contextP, targetP);
+                }
+            }
+            
             break;
 
         default:
@@ -1956,3 +2160,53 @@ void registration_step(lwm2m_context_t * contextP,
 
 }
 
+#ifdef LWM2M_CLIENT_MODE
+
+int registration_getMandatoryInfo(lwm2m_object_t * objectP,
+                                uint16_t instanceID,
+                                lwm2m_server_t * targetP)
+{
+    lwm2m_data_t * dataP;
+    int size;
+    int64_t value;
+
+    size = 2;
+    dataP = lwm2m_data_new(size);
+    if (dataP == NULL) return -1;
+    dataP[0].id = LWM2M_SERVER_LIFETIME_ID;
+    dataP[1].id = LWM2M_SERVER_BINDING_ID;
+
+    if (objectP->readFunc(instanceID, &size, &dataP, objectP) != COAP_205_CONTENT)
+    {
+        lwm2m_data_free(size, dataP);
+        return -1;
+    }
+
+    if (0 == lwm2m_data_decode_int(dataP, &value)
+     || value < 0 || value >0xFFFFFFFF)             // This is an implementation limit
+    {
+        lwm2m_data_free(size, dataP);
+        return -1;
+    }
+    targetP->lifetime = value;
+
+    if (dataP[1].type == LWM2M_TYPE_STRING)
+    {
+        targetP->binding = utils_stringToBinding(dataP[1].value.asBuffer.buffer, dataP[1].value.asBuffer.length);
+    }
+    else
+    {
+        targetP->binding = BINDING_UNKNOWN;
+    }
+
+    lwm2m_data_free(size, dataP);
+
+    if (targetP->binding == BINDING_UNKNOWN)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+#endif

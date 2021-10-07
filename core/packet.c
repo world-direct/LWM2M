@@ -115,7 +115,7 @@ static uint8_t handle_request(lwm2m_context_t * contextP,
     LOG("Entering");
 	
 #ifdef LWM2M_CLIENT_MODE
-    requestType = uri_decode(contextP->altPath, message->uri_path, &uri);
+    requestType = uri_decode(NULL, message->uri_path, &uri);
 #else
     requestType = uri_decode(NULL, message->uri_path, &uri);
 #endif
@@ -204,8 +204,8 @@ void lwm2m_handle_packet(lwm2m_context_t * contextP,
                          void * fromSessionH)
 {
     uint8_t coap_error_code = NO_ERROR;
-    static coap_packet_t message[1];
-    static coap_packet_t response[1];
+    coap_packet_t message[1];
+    coap_packet_t response[1];
 
     LOG("Entering");
     coap_error_code = coap_parse_message(message, buffer, (uint16_t)length);
@@ -271,24 +271,22 @@ void lwm2m_handle_packet(lwm2m_context_t * contextP,
                     uint16_t block1_size;
                     uint8_t * complete_buffer = NULL;
                     size_t complete_buffer_size;
+                    char * uri = uriPathToString(message->uri_path);
 
                     // parse block1 header
                     coap_get_header_block1(message, &block1_num, &block1_more, &block1_size, NULL);
                     LOG_ARG("Blockwise: block1 request NUM %u (SZX %u/ SZX Max%u) MORE %u", block1_num, block1_size, REST_MAX_CHUNK_SIZE, block1_more);
 
                     // handle block 1
-                    coap_error_code = coap_block1_handler(&serverP->block1Data, message->mid, message->payload, message->payload_len, block1_size, block1_num, block1_more, &complete_buffer, &complete_buffer_size);
-
+                    coap_error_code = coap_block1_handler(contextP, serverP, uri, message->mid, message->payload, message->payload_len, block1_size, block1_num, block1_more, &complete_buffer, &complete_buffer_size);
+                    lwm2m_free(uri);
+                    block1_size = MIN(block1_size, REST_MAX_CHUNK_SIZE);
+                    coap_set_header_block1(response,block1_num, block1_more,block1_size);
                     // if payload is complete, replace it in the coap message.
                     if (coap_error_code == NO_ERROR)
                     {
                         message->payload = complete_buffer;
                         message->payload_len = complete_buffer_size;
-                    }
-                    else if (coap_error_code == COAP_231_CONTINUE)
-                    {
-                        block1_size = MIN(block1_size, REST_MAX_CHUNK_SIZE);
-                        coap_set_header_block1(response,block1_num, block1_more,block1_size);
                     }
                 }
 #else

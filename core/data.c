@@ -95,16 +95,17 @@ static int prv_textSerialize(lwm2m_data_t * dataP,
     {
         char stringBuffer[11];
         size_t length;
+		res = 0;
         
-        length = utils_intToText(dataP->value.asObjLink.objectId, (uint8_t*)stringBuffer, 5);
+        length = utils_intToText(dataP->value.asObjLink.objectId, (uint8_t*)stringBuffer + res, 5);
         if (length == 0) return -1;
+		res += length;
 
-        stringBuffer[5] = ':';
-        res = length + 1;
+        stringBuffer[res] = ':';
+        res += 1;
 
         length = utils_intToText(dataP->value.asObjLink.objectInstanceId, (uint8_t*)stringBuffer + res, 5);
         if (length == 0) return -1;
-
         res += length;
 
         *bufferP = (uint8_t *)lwm2m_malloc(res);
@@ -600,6 +601,37 @@ void lwm2m_data_encode_objlink(uint16_t objectId,
     dataP->type = LWM2M_TYPE_OBJECT_LINK;
     dataP->value.asObjLink.objectId = objectId;
     dataP->value.asObjLink.objectInstanceId = objectInstanceId;
+}
+
+int lwm2m_data_decode_objlink(uint16_t * objectId, uint16_t * objectInstanceId, lwm2m_data_t const * dataP) {
+    int result = 0;
+    switch(dataP->type) {
+        case LWM2M_TYPE_OPAQUE:
+            if(dataP->value.asBuffer.length == 4){
+                *objectId = dataP->value.asBuffer.buffer[0] << 8 | dataP->value.asBuffer.buffer[1];
+                *objectInstanceId = dataP->value.asBuffer.buffer[2] << 8 | dataP->value.asBuffer.buffer[3];
+                result = 1;
+            }
+            
+        break;
+
+        case LWM2M_TYPE_STRING:
+            if(utils_textToObjLink(dataP->value.asBuffer.buffer,dataP->value.asBuffer.length,objectId,objectInstanceId)){
+                result = 1;
+            }
+        break;
+
+        case LWM2M_TYPE_OBJECT_LINK:
+            result = 1;
+            *objectId = dataP->value.asObjLink.objectId;
+            *objectInstanceId = dataP->value.asObjLink.objectInstanceId;
+        break;
+        
+        default:
+            result = 0;
+    }
+
+    return result;
 }
 
 void lwm2m_data_include(lwm2m_data_t * subDataP,

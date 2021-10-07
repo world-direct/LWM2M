@@ -91,6 +91,32 @@ int uri_getNumber(uint8_t * uriString,
     return prv_parseNumber(uriString, uriLength, &index);
 }
 
+char * uriPathToString(multi_option_t * uriPath) {
+    int i = 0;
+    char * str = NULL;
+    multi_option_t * ptr = NULL;
+    int len = 0;
+    if(uriPath == NULL) return NULL;
+    ptr = uriPath;
+    len = 0;
+    while(ptr != NULL){
+        len+= ptr->len+1;
+        ptr = ptr->next;
+    }
+    str = lwm2m_malloc(len+1);
+    memset(str,0,len+1);
+    if(str == NULL) return NULL;
+    ptr = uriPath;
+    while(ptr != NULL){
+        str[i] = '/';
+        i++;
+        memcpy(str+i,ptr->data,ptr->len);
+        i = i + ptr->len;
+        ptr = ptr->next;
+    }
+    return str;
+}
+
 
 lwm2m_request_type_t uri_decode(char * altPath,
                                 multi_option_t *uriPath,

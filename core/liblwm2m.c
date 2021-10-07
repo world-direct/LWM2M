@@ -98,7 +98,6 @@ static void prv_deleteServer(lwm2m_server_t * serverP, void *userData)
     {
         lwm2m_free(serverP->location);
     }
-    free_block1_buffer(serverP->block1Data);
     lwm2m_free(serverP);
 }
 
@@ -121,7 +120,6 @@ static void prv_deleteBootstrapServer(lwm2m_server_t * serverP, void *userData)
     {
          lwm2m_close_connection(serverP->sessionH, userData);
     }
-    free_block1_buffer(serverP->block1Data);
     lwm2m_free(serverP);
 }
 
@@ -169,6 +167,14 @@ void prv_deleteTransactionList(lwm2m_context_t * context)
     }
 }
 
+void prv_deleteBlock1HandlerList(lwm2m_context_t * context) {
+    while(context->block1HandlerList != NULL){
+        lwm2m_block1_write_handler * handler = context->block1HandlerList;
+        context->block1HandlerList = handler->next;
+        block1_handler_free(handler);
+    }
+}
+
 void lwm2m_close(lwm2m_context_t * contextP)
 {
 #ifdef LWM2M_CLIENT_MODE
@@ -189,7 +195,7 @@ void lwm2m_close(lwm2m_context_t * contextP)
     }
 
 #endif
-
+    
 #ifdef LWM2M_SERVER_MODE
     while (NULL != contextP->clientList)
     {
@@ -201,7 +207,7 @@ void lwm2m_close(lwm2m_context_t * contextP)
         registration_freeClient(clientP);
     }
 #endif
-
+    prv_deleteBlock1HandlerList(contextP);
     prv_deleteTransactionList(contextP);
     lwm2m_free(contextP);
 }
@@ -475,6 +481,7 @@ next_step:
 
     registration_step(contextP, tv_sec, timeoutP);
     transaction_step(contextP, tv_sec, timeoutP);
+    block1_step(contextP, tv_sec, timeoutP);
 
     LOG_ARG("Final timeoutP: %" PRId64, *timeoutP);
 #ifdef LWM2M_CLIENT_MODE
