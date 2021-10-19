@@ -1110,7 +1110,8 @@ int lwm2m_update_registration(lwm2m_context_t * contextP,
         else
         {
             if (targetP->status == STATE_REGISTERED
-             || targetP->status == STATE_REG_UPDATE_PENDING)
+             || targetP->status == STATE_REG_UPDATE_PENDING
+             || targetP->status == STATE_REG_UPDATE_NEEDED)
             {
                 if (withObjects == true)
                 {
