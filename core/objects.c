@@ -318,7 +318,7 @@ uint8_t object_create(lwm2m_context_t * contextP,
         if (NULL != lwm2m_list_find(targetP->instanceList, dataP[0].id))
         {
             // Instance already exists
-            result = COAP_406_NOT_ACCEPTABLE;
+            result = COAP_400_BAD_REQUEST;
             goto exit;
         }
         result = targetP->createFunc(dataP[0].id, dataP[0].value.asChildren.count, dataP[0].value.asChildren.array, targetP);
