@@ -826,6 +826,21 @@ void observe_step(lwm2m_context_t * contextP,
     }
 }
 
+void lwm2m_update_observe_time(lwm2m_context_t * contextP, int diff) {
+    lwm2m_observed_t * observeP = contextP->observedList;
+
+    while(observeP) {
+        lwm2m_watcher_t * watcherP = observeP->watcherList;
+
+        while(watcherP) {
+            watcherP->lastTime += diff;
+            watcherP = watcherP->next;
+        }
+
+        observeP = observeP->next;
+    }
+}
+
 #endif
 
 #ifdef LWM2M_SERVER_MODE

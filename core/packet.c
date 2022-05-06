@@ -262,7 +262,7 @@ void lwm2m_handle_packet(lwm2m_context_t * contextP,
 #endif
                 if (serverP == NULL)
                 {
-                    coap_error_code = COAP_500_INTERNAL_SERVER_ERROR;
+                    coap_error_code = COAP_IGNORE;
                 }
                 else
                 {

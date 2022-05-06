@@ -471,3 +471,15 @@ void transaction_step(lwm2m_context_t * contextP,
         transacP = nextP;
     }
 }
+
+#ifdef LWM2M_CLIENT_MODE
+void lwm2m_update_transaction_time(lwm2m_context_t * contextP, int diff) {
+    lwm2m_transaction_t * transP = contextP->transactionList;
+
+    while(transP) {
+        transP->retrans_time += diff;
+
+        transP = transP->next;
+    }
+}
+#endif

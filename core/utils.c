@@ -878,3 +878,14 @@ lwm2m_data_type_t utils_depthToDatatype(uri_depth_t depth)
 
     return LWM2M_TYPE_UNDEFINED;
 }
+
+#ifdef LWM2M_CLIENT_MODE
+void lwm2m_updated_time(lwm2m_context_t * contextP, int diff) {
+    lwm2m_update_registration_time(contextP, diff);
+    lwm2m_update_observe_time(contextP, diff);
+    lwm2m_update_block1_time(contextP, diff);
+    lwm2m_update_transaction_time(contextP, diff);
+}
+
+
+#endif

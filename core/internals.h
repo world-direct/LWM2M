@@ -420,6 +420,11 @@ size_t utils_base64Decode(const char * dataP, size_t dataLen, uint8_t * bufferP,
 #ifdef LWM2M_CLIENT_MODE
 lwm2m_server_t * utils_findServer(lwm2m_context_t * contextP, void * fromSessionH);
 lwm2m_server_t * utils_findBootstrapServer(lwm2m_context_t * contextP, void * fromSessionH);
+
+void lwm2m_update_registration_time(lwm2m_context_t * contextP, int diff);
+void lwm2m_update_observe_time(lwm2m_context_t * contextP, int diff);
+void lwm2m_update_block1_time(lwm2m_context_t * contextP, int diff);
+void lwm2m_update_transaction_time(lwm2m_context_t * contextP, int diff);
 #endif
 
 #endif

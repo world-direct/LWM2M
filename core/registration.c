@@ -1136,6 +1136,15 @@ int lwm2m_update_registration(lwm2m_context_t * contextP,
     return result;
 }
 
+void lwm2m_update_registration_time(lwm2m_context_t * contextP, int diff) {
+    lwm2m_server_t * serverP = contextP->serverList;
+
+    while(serverP) {
+        serverP->registration += diff;
+        serverP = serverP->next;
+    }
+}
+
 uint8_t registration_start(lwm2m_context_t * contextP, bool restartFailed)
 {
     lwm2m_server_t * targetP;

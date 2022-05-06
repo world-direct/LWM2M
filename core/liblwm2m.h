@@ -766,6 +766,7 @@ int lwm2m_remove_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t* uri);
 int lwm2m_update_registration(lwm2m_context_t * contextP, uint16_t shortServerID, bool withObjects);
 
 void lwm2m_resource_value_changed(lwm2m_context_t * contextP, lwm2m_uri_t * uriP);
+void lwm2m_updated_time(lwm2m_context_t * contextP, int diff);
 #endif
 
 #ifdef LWM2M_SERVER_MODE

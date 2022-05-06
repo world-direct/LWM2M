@@ -322,6 +322,22 @@ void block1_handler_free(lwm2m_block1_write_handler * handler) {
 
 #ifdef LWM2M_CLIENT_MODE
 
+void lwm2m_update_block1_time(lwm2m_context_t * contextP, int diff) {
+    lwm2m_block1_write_handler * handlerP = contextP->block1HandlerList;
+
+    while(handlerP) {
+        lwm2m_block1_peer_list * peerP = handlerP->peerList;
+
+        while(peerP) {
+            peerP->timeout += diff;
+
+            peerP = peerP->next;
+        }
+
+        handlerP = handlerP->next;
+    }
+}
+
 int lwm2m_add_block1_handler(lwm2m_context_t * contextP, lwm2m_uri_t * uri, lwm2m_block1_write_callback callback, void* userData) {
     uint8_t uriString[URI_MAX_STRING_LEN+1];
     lwm2m_block1_write_handler * handler = NULL;
