@@ -54,6 +54,9 @@
 #include <float.h>
 #include <math.h>
 
+static uint8_t const INF_CHARS[] = {226, 136, 158};
+static uint8_t const NAN_CHARS[] = {78, 97, 78};
+
 lwm2m_internal_list_t *utils_addToList(lwm2m_internal_list_t *head, lwm2m_internal_list_t *node)
 {
     if (head == NULL) {
@@ -173,6 +176,24 @@ int utils_textToFloat(const uint8_t *buffer,
         return 0;
     }
 
+    // special float values
+    if(length == 3) {
+        if(memcmp(buffer, NAN_CHARS, sizeof(NAN_CHARS)) == 0) {
+            *dataP = NAN;
+            return 1;
+        }
+        else if(memcmp(buffer, INF_CHARS, sizeof(INF_CHARS)) == 0) {
+            *dataP = INFINITY;
+            return 1;
+        }
+    }
+    else if(length == 4) {
+        if(buffer[0] == '-' && memcmp(buffer + 1, INF_CHARS, sizeof(INF_CHARS)) == 0) {
+            *dataP = -1 * INFINITY;
+            return 1;
+        }
+    }
+
     if (buffer[0] == '-') {
         sign = -1;
         i = 1;
@@ -183,7 +204,7 @@ int utils_textToFloat(const uint8_t *buffer,
 
     result = 0;
     while (i < length && buffer[i] != '.') {
-        if ('0' <= buffer[i] && buffer[i] <= '9') {
+        if (buffer[i] >= '0' && buffer[i] <= '9') {
             if (result > (DBL_MAX / 10)) {
                 return 0;
             }
@@ -204,7 +225,7 @@ int utils_textToFloat(const uint8_t *buffer,
 
         dec = 0.1;
         while (i < length) {
-            if ('0' <= buffer[i] && buffer[i] <= '9') {
+            if (buffer[i] >= '0' && buffer[i] <= '9') {
                 if (result > (DBL_MAX - 1)) {
                     return 0;
                 }
@@ -319,26 +340,20 @@ size_t utils_floatToText(double data,
     double decPart;
 
     if (isnan(data)) {
-        string[0] = 78;
-        string[1] = 97;
-        string[2] = 78;
-        intLength = 3;
+        memcpy(string, NAN_CHARS, sizeof(NAN_CHARS));
+        intLength = sizeof(NAN_CHARS);
         return intLength;
     }
 
     if (isinf(data)) {
         if (data > 0) {
-            string[0] = 226;
-            string[1] = 136;
-            string[2] = 158;
-            intLength = 3;
+            memcpy(string, INF_CHARS, sizeof(INF_CHARS));
+            intLength = sizeof(INF_CHARS);
             return intLength;
         } else {
-            string[0] = 45;
-            string[1] = 226;
-            string[2] = 136;
-            string[3] = 158;
-            intLength = 4;
+            string[0] = '-';
+            memcpy(string + 1, INF_CHARS, sizeof(INF_CHARS));
+            intLength = sizeof(INF_CHARS) + 1;
             return intLength;
         }
     }
