@@ -695,6 +695,8 @@ typedef int (*lwm2m_bootstrap_callback_t) (void * sessionH, uint8_t status, lwm2
 //if blockmore == false you could return any result code, if you want to forward data to your resource, set buffer and size accordingly and return COAP_NO_ERROR
 typedef uint8_t (*lwm2m_block1_write_callback) (void * peer, uint8_t blockMore, uint8_t * * buffer, size_t * size, void * userData);
 
+typedef uint8_t (*lwm2m_bootstrap_finish_verify_callback) (void * context);
+
 typedef struct _lwm2m_block1_peer_list{
     struct _lwm2m_block1_peer_list * next;
     void * peer;
@@ -723,6 +725,9 @@ struct _lwm2m_context_
     lwm2m_server_t *     serverList;
     lwm2m_object_t *     objectList;
     lwm2m_observed_t *   observedList;
+#ifdef LWM2M_BOOTSTRAP
+    lwm2m_bootstrap_finish_verify_callback bootstrapFinishCallback;
+#endif
 #endif
 #ifdef LWM2M_SERVER_MODE
     lwm2m_client_t *        clientList;

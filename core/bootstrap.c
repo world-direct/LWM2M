@@ -219,6 +219,9 @@ uint8_t bootstrap_handleFinish(lwm2m_context_t * context,
         {
             LOG("Bootstrap server status changed to STATE_BS_FINISHING");
             bootstrapServer->status = STATE_BS_FINISHING;
+            if(context->bootstrapFinishCallback) {
+                return context->bootstrapFinishCallback(context);
+            }
             return COAP_204_CHANGED;
         }
         else
