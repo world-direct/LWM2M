@@ -1797,6 +1797,8 @@ uint8_t registration_handleRequest(lwm2m_context_t * contextP,
         lwm2m_media_type_t format;
         lwm2m_client_t * clientP;
         char location[MAX_LOCATION_LENGTH];
+        uint64_t message_token = 0;
+        bool newly_registered = false;
 
         if (0 != prv_getParameters(message->uri_query, &name, &lifetime, &msisdn, &binding, &version))
         {
@@ -1853,15 +1855,23 @@ uint8_t registration_handleRequest(lwm2m_context_t * contextP,
                 lifetime = LWM2M_DEFAULT_LIFETIME;
             }
 
+            for(int i = 0; i < message->token_len; i++) {
+                message_token |= message->token[i] << i * 8;
+            }
+
             clientP = prv_getClientByName(contextP, name);
             if (clientP != NULL)
             {
-                // we reset this registration
-                lwm2m_free(clientP->name);
-                if (clientP->msisdn != NULL) lwm2m_free(clientP->msisdn);
-                if (clientP->altPath != NULL) lwm2m_free(clientP->altPath);
-                prv_freeClientObjectList(clientP->objectList);
-                clientP->objectList = NULL;
+                // did not already receive registration (is not a retransmission)
+                if(clientP->registration_token != message_token) {
+                    // we reset this registration
+                    lwm2m_free(clientP->name);
+                    if (clientP->msisdn != NULL) lwm2m_free(clientP->msisdn);
+                    if (clientP->altPath != NULL) lwm2m_free(clientP->altPath);
+                    prv_freeClientObjectList(clientP->objectList);
+                    clientP->objectList = NULL;
+                    newly_registered = true;
+                }
             }
             else
             {
@@ -1877,16 +1887,28 @@ uint8_t registration_handleRequest(lwm2m_context_t * contextP,
                 memset(clientP, 0, sizeof(lwm2m_client_t));
                 clientP->internalID = lwm2m_list_newId((lwm2m_list_t *)contextP->clientList);
                 contextP->clientList = (lwm2m_client_t *)LWM2M_LIST_ADD(contextP->clientList, clientP);
+                newly_registered = true;
             }
-            clientP->name = name;
+
+            if(newly_registered) {
+                clientP->name = name;
+                clientP->msisdn = msisdn;
+                clientP->altPath = altPath;
+                clientP->objectList = objects;
+            }
+            else {
+                lwm2m_free(name);
+                lwm2m_free(msisdn);
+                lwm2m_free(altPath);
+                prv_freeClientObjectList(objects);
+            }
+
+            clientP->registration_token = message_token;
             clientP->version = version;
             clientP->binding = binding;
-            clientP->msisdn = msisdn;
-            clientP->altPath = altPath;
             clientP->format = format;
             clientP->lifetime = lifetime;
             clientP->endOfLife = tv_sec + lifetime;
-            clientP->objectList = objects;
             clientP->sessionH = fromSessionH;
 
             if (prv_getLocationString(clientP->internalID, location) == 0)
@@ -1900,7 +1922,8 @@ uint8_t registration_handleRequest(lwm2m_context_t * contextP,
                 return COAP_500_INTERNAL_SERVER_ERROR;
             }
 
-            if (contextP->monitorCallback != NULL)
+            // only notify if registration was received the first time
+            if (contextP->monitorCallback != NULL && newly_registered)
             {
                 contextP->monitorCallback(clientP->internalID, NULL, COAP_201_CREATED, LWM2M_CONTENT_TEXT, NULL, 0, contextP->monitorUserData);
             }

@@ -601,6 +601,7 @@ typedef struct _lwm2m_client_
     lwm2m_client_object_t * objectList;
     lwm2m_observation_t *   observationList;
     uint16_t                observationId;
+    uint64_t                registration_token;
 } lwm2m_client_t;
 
 
