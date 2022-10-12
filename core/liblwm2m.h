@@ -788,6 +788,7 @@ typedef int (*lwm2m_blockwise_buffer_callback) (uint32_t lastSentByte, uint8_t *
 
 // Device Management APIs
 int lwm2m_dm_read(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
+int lwm2m_dm_read_format(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_discover(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_write(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, uint8_t * buffer, int length, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_write_block1(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_media_type_t format, lwm2m_uri_t * uriP, uint32_t completeSize, lwm2m_blockwise_buffer_callback callback, void * userData, lwm2m_result_callback_t resultCallback, void * resultUserData);
