@@ -695,6 +695,8 @@ typedef int (*lwm2m_bootstrap_callback_t) (void * sessionH, uint8_t status, lwm2
 //if blockmore == false you could return any result code, if you want to forward data to your resource, set buffer and size accordingly and return COAP_NO_ERROR
 typedef uint8_t (*lwm2m_block1_write_callback) (void * peer, uint8_t blockMore, uint8_t * * buffer, size_t * size, void * userData);
 
+typedef uint8_t (*lwm2m_bootstrap_finish_verify_callback) (void * context);
+
 typedef struct _lwm2m_block1_peer_list{
     struct _lwm2m_block1_peer_list * next;
     void * peer;
@@ -723,6 +725,9 @@ struct _lwm2m_context_
     lwm2m_server_t *     serverList;
     lwm2m_object_t *     objectList;
     lwm2m_observed_t *   observedList;
+#ifdef LWM2M_BOOTSTRAP
+    lwm2m_bootstrap_finish_verify_callback bootstrapFinishCallback;
+#endif
 #endif
 #ifdef LWM2M_SERVER_MODE
     lwm2m_client_t *        clientList;
@@ -782,6 +787,7 @@ typedef int (*lwm2m_blockwise_buffer_callback) (uint32_t lastSentByte, uint8_t *
 
 // Device Management APIs
 int lwm2m_dm_read(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
+int lwm2m_dm_read_format(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_discover(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_write(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, uint8_t * buffer, int length, lwm2m_result_callback_t callback, void * userData);
 int lwm2m_dm_write_block1(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_media_type_t format, lwm2m_uri_t * uriP, uint32_t completeSize, lwm2m_blockwise_buffer_callback callback, void * userData, lwm2m_result_callback_t resultCallback, void * resultUserData);

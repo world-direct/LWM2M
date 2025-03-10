@@ -494,10 +494,21 @@ int lwm2m_dm_read(lwm2m_context_t * contextP,
 
     clientP = (lwm2m_client_t *)lwm2m_list_find((lwm2m_list_t *)contextP->clientList, clientID);
     if (clientP == NULL) return COAP_404_NOT_FOUND;
+    return lwm2m_dm_read_format(contextP, clientID, uriP, clientP->format, callback, userData);
+}
+
+int lwm2m_dm_read_format(lwm2m_context_t * contextP, uint16_t clientID, lwm2m_uri_t * uriP, lwm2m_media_type_t format, lwm2m_result_callback_t callback, void * userData) {
+    lwm2m_client_t * clientP;
+
+    LOG_ARG("clientID: %d", clientID);
+    LOG_URI(uriP);
+
+    clientP = (lwm2m_client_t *)lwm2m_list_find((lwm2m_list_t *)contextP->clientList, clientID);
+    if (clientP == NULL) return COAP_404_NOT_FOUND;
 
     return prv_makeOperation(contextP, clientID, uriP,
                              COAP_GET,
-                             clientP->format,
+                             format,
                              NULL, 0,
                              callback, userData);
 }

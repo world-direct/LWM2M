@@ -209,6 +209,7 @@ uint8_t bootstrap_handleFinish(lwm2m_context_t * context,
                                void * fromSessionH)
 {
     lwm2m_server_t * bootstrapServer;
+    uint8_t result;
 
     LOG("Entering");
     bootstrapServer = utils_findBootstrapServer(context, fromSessionH);
@@ -219,6 +220,13 @@ uint8_t bootstrap_handleFinish(lwm2m_context_t * context,
         {
             LOG("Bootstrap server status changed to STATE_BS_FINISHING");
             bootstrapServer->status = STATE_BS_FINISHING;
+            if(context->bootstrapFinishCallback) {
+                result = context->bootstrapFinishCallback(context);
+                if(result != COAP_204_CHANGED) {
+                    bootstrapServer->status = STATE_BS_FAILING;
+                }
+                return result;
+            }
             return COAP_204_CHANGED;
         }
         else
